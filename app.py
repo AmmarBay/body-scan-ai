@@ -3,11 +3,10 @@ import numpy as np
 import pickle
 from PIL import Image
 
-# Persiapan Computer Vision
 try:
     import mediapipe as mp
-    from mediapipe.python.solutions import pose as mp_pose
-    from mediapipe.python.solutions import drawing_utils as mp_drawing
+    mp_pose = mp.solutions.pose
+    mp_drawing = mp.solutions.drawing_utils
     MEDIAPIPE_READY = True
 except Exception as e:
     st.error(f"⚠️ Sistem CV Gagal Dimuat: {e}")
