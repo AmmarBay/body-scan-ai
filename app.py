@@ -37,7 +37,7 @@ st.write("---")
 
 # 2. AMBIL FOTO & COMPUTER VISION
 st.header("2. Ambil Foto Tubuh (Computer Vision)")
-st.info("Sistem mendeteksi proporsi tubuh. Pastikan kepala hingga pinggang terlihat.")
+st.info("Sistem mendeteksi proporsi tubuh. Pastikan tubuh terlihat dari kepala hingga dada/pinggang.")
 foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
 pose_detected = False
@@ -46,10 +46,11 @@ if foto_kamera is not None:
     image_np = np.array(image)
     validasi_sukses = False
     metode_deteksi = ""
-    pesan_error = "❌ Gagal: Sistem mendeteksi benda mati/bukan manusia!"
+    
+    # Pesan default yang lebih akurat dan tidak menuduh benda mati
+    pesan_error = "❌ Gagal: Postur tubuh tidak jelas. Pastikan foto manusia utuh terlihat (kepala hingga dada/pinggang) dengan jarak yang pas."
     
     if MEDIAPIPE_READY:
-        # Rencana A: Validasi Sendi MediaPipe
         with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
             results = pose.process(image_np)
             if results.pose_landmarks:
@@ -57,28 +58,25 @@ if foto_kamera is not None:
                 validasi_sukses = True
                 metode_deteksi = "MediaPipe Pose"
                 
-    # Rencana B: Jika MediaPipe gagal, panggil OpenCV dengan Analisis Proporsi Spasial
     if not validasi_sukses:
         gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=8, minSize=(60, 60))
+        
+        # Sensitivitas diturunkan sedikit agar wajah close-up tetap terbaca (minNeighbors=5)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
         
         if len(faces) > 0:
-            tinggi_gambar = image_np.shape[0] # Mengambil tinggi total foto
+            tinggi_gambar = image_np.shape[0]
             
             for (x, y, w, h) in faces:
-                # Hitung rasio wajah terhadap tinggi frame foto
                 rasio_wajah = h / tinggi_gambar
                 
-                if rasio_wajah > 0.35:
-                    # Wajah memakan lebih dari 35% tinggi frame = Terlalu Dekat (Close-up Kepala)
-                    pesan_error = "❌ Gagal: Kamera terlalu dekat. Silakan mundur agar tubuh bagian atas terlihat!"
+                if rasio_wajah > 0.30: # Jika wajah memakan 30% area foto
+                    pesan_error = "❌ Gagal: Kamera terlalu dekat (hanya wajah). Silakan mundur agar proporsi tubuh terlihat!"
                     validasi_sukses = False
-                    # Gambar kotak merah sebagai tanda ditolak
-                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (255, 0, 0), 3)
+                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (255, 0, 0), 3) # Kotak Merah
                 else:
-                    # Proporsi ideal, jarak kamera pas
-                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3)
+                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3) # Kotak Hijau
                     validasi_sukses = True
                     metode_deteksi = "OpenCV Spatial Proportion AI"
 
