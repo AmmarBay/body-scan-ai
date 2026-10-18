@@ -13,7 +13,7 @@ try:
         mp_drawing = mp.solutions.drawing_utils
         MEDIAPIPE_READY = True
 except Exception:
-    pass # Menyembunyikan pesan merah dari layar
+    pass 
 
 st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
@@ -37,7 +37,7 @@ st.write("---")
 
 # 2. AMBIL FOTO & COMPUTER VISION
 st.header("2. Ambil Foto Tubuh (Computer Vision)")
-st.info("Sistem akan mendeteksi keberadaan subjek manusia. Benda mati akan ditolak.")
+st.info("Sistem mendeteksi subjek manusia dengan Filter Super Ketat. Benda mati tertolak otomatis.")
 foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
 pose_detected = False
@@ -45,32 +45,38 @@ if foto_kamera is not None:
     image = Image.open(foto_kamera)
     image_np = np.array(image)
     validasi_sukses = False
+    metode_deteksi = ""
     
     if MEDIAPIPE_READY:
-        # Rencana A: Validasi Sendi MediaPipe
-        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
+        # Rencana A: Validasi Sendi MediaPipe (Sensitivitas Sangat Tinggi 80%)
+        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
             results = pose.process(image_np)
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
                 validasi_sukses = True
-    else:
-        # RENCANA B (BACKUP): Validasi Wajah OpenCV jika Server MediaPipe down
+                metode_deteksi = "MediaPipe Pose"
+                
+    # Rencana B: Jika MediaPipe gagal, panggil OpenCV
+    if not validasi_sukses:
         gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        # FILTER KETAT ANTI-HALUSINASI (minNeighbors=8, minSize=60x60)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=8, minSize=(60, 60))
         
         if len(faces) > 0:
             for (x, y, w, h) in faces:
-                cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3)
             validasi_sukses = True
+            metode_deteksi = "OpenCV Face AI"
 
     if validasi_sukses:
-        st.image(image_np, caption="Subjek Manusia Berhasil Divalidasi", use_column_width=True)
+        st.image(image_np, caption=f"Divalidasi oleh {metode_deteksi}", use_column_width=True)
         st.success("✅ Validasi Berhasil: Subjek manusia terdeteksi!")
         pose_detected = True
     else:
         st.image(image_np, caption="Objek Tidak Dikenali", use_column_width=True)
-        st.error("❌ Gagal: Tidak ada manusia yang terdeteksi. Pastikan foto bukan benda mati!")
+        st.error("❌ Gagal: Sistem mendeteksi benda mati/bukan manusia!")
         pose_detected = False
 st.write("---")
 
@@ -80,7 +86,7 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
     if foto_kamera is None:
         st.error("Gagal diproses: Anda belum mengambil foto tubuh!")
     elif not pose_detected:
-        st.error("Gagal diproses: Foto tertolak! Sistem mendeteksi objek bukan manusia.")
+        st.error("Gagal diproses: Foto tertolak! Sistem menolak memproses benda mati.")
     else:
         st.write("⏳ *Menggabungkan data foto (CV) dan data input numerik...*")
         
