@@ -129,8 +129,12 @@ with tab2:
         st.info(f"🏋️ **Program Latihan:** {saran}")
         if tidur < 7: st.error("🛌 **Regenerasi:** Kurang dari 7 jam! Berisiko menghambat metabolisme pembakaran lemak.")
         else: st.success("🛌 **Regenerasi:** Optimal. Pertahankan untuk regulasi hormon.")
-        if lingkar_pinggang > 90:
-            st.warning("⚠️ **Indikator Metabolik:** Lingkar pinggang di atas 90 cm. Kurangi asupan gula dan tingkatkan kardio.")
+        # --- LOGIKA INDIKATOR METABOLIK CERDAS ---
+        batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
+        
+        if lingkar_pinggang > batas_pinggang:
+            st.warning(f"⚠️ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) melebihi batas aman {jenis_kelamin} ({batas_pinggang} cm). Ini menandakan penumpukan lemak visceral perut. Kurangi asupan gula dan tingkatkan kardio.")
         else:
-            st.success("✅ **Indikator Metabolik:** Lingkar pinggang aman dari risiko sindrom metabolik.")
+            st.success(f"✅ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) aman dari risiko sindrom metabolik (Batas {jenis_kelamin}: {batas_pinggang} cm).")
+        # -----------------------------------------
         st.balloons()
