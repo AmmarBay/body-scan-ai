@@ -6,8 +6,8 @@ from PIL import Image
 # Persiapan Computer Vision
 try:
     import mediapipe as mp
-    mp_pose = mp.solutions.pose
-    mp_drawing = mp.solutions.drawing_utils
+    from mediapipe.python.solutions import pose as mp_pose
+    from mediapipe.python.solutions import drawing_utils as mp_drawing
     MEDIAPIPE_READY = True
 except Exception as e:
     st.error(f"⚠️ Sistem CV Gagal Dimuat: {e}")
