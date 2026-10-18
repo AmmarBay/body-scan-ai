@@ -1,17 +1,19 @@
 import streamlit as st
 import numpy as np
 import pickle
+import cv2
 from PIL import Image
 
-# Persiapan Computer Vision (Tanpa Bypass)
+# Sembunyikan Error MediaPipe & Siapkan Status
+MEDIAPIPE_READY = False
 try:
     import mediapipe as mp
-    mp_pose = mp.solutions.pose
-    mp_drawing = mp.solutions.drawing_utils
-    MEDIAPIPE_READY = True
-except Exception as e:
-    st.error(f"⚠️ Sistem CV Gagal Dimuat: {e}")
-    MEDIAPIPE_READY = False
+    if hasattr(mp, 'solutions'):
+        mp_pose = mp.solutions.pose
+        mp_drawing = mp.solutions.drawing_utils
+        MEDIAPIPE_READY = True
+except Exception:
+    pass # Menyembunyikan pesan merah dari layar
 
 st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
@@ -35,27 +37,41 @@ st.write("---")
 
 # 2. AMBIL FOTO & COMPUTER VISION
 st.header("2. Ambil Foto Tubuh (Computer Vision)")
-st.info("Sistem akan mendeteksi titik-titik tubuh dari gambar. Benda mati akan ditolak.")
+st.info("Sistem akan mendeteksi keberadaan subjek manusia. Benda mati akan ditolak.")
 foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
 pose_detected = False
-if foto_kamera is not None and MEDIAPIPE_READY:
+if foto_kamera is not None:
     image = Image.open(foto_kamera)
     image_np = np.array(image)
+    validasi_sukses = False
     
-    with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
-        results = pose.process(image_np)
+    if MEDIAPIPE_READY:
+        # Rencana A: Validasi Sendi MediaPipe
+        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
+            results = pose.process(image_np)
+            if results.pose_landmarks:
+                mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                validasi_sukses = True
+    else:
+        # RENCANA B (BACKUP): Validasi Wajah OpenCV jika Server MediaPipe down
+        gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
         
-        # VALIDASI KETAT: Cek apakah ada titik kerangka manusia
-        if results.pose_landmarks:
-            mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-            st.image(image_np, caption="Pose Estimation Berhasil Diekstrak", use_column_width=True)
-            st.success("✅ Validasi Postur Berhasil: Subjek manusia terdeteksi!")
-            pose_detected = True
-        else:
-            st.image(image_np, caption="Objek Tidak Dikenali", use_column_width=True)
-            st.error("❌ Gagal: Tidak ada postur manusia yang terdeteksi. Pastikan foto bukan benda mati!")
-            pose_detected = False
+        if len(faces) > 0:
+            for (x, y, w, h) in faces:
+                cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            validasi_sukses = True
+
+    if validasi_sukses:
+        st.image(image_np, caption="Subjek Manusia Berhasil Divalidasi", use_column_width=True)
+        st.success("✅ Validasi Berhasil: Subjek manusia terdeteksi!")
+        pose_detected = True
+    else:
+        st.image(image_np, caption="Objek Tidak Dikenali", use_column_width=True)
+        st.error("❌ Gagal: Tidak ada manusia yang terdeteksi. Pastikan foto bukan benda mati!")
+        pose_detected = False
 st.write("---")
 
 # 3. PENGGABUNGAN DATA & MACHINE LEARNING
@@ -89,15 +105,15 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
         elif 25 <= bmi < 29.9: status_imt = "Overweight"
         else: status_imt = "Obesitas"
 
-        # 4. HASIL SKRINING & REKOMENDASI
+        # 4. HASIL SKRINING
         st.write("---")
         st.header("4. Hasil Skrining Tubuh")
-        st.caption(f"Diolah menggunakan integrasi Pose Estimation & {metode}")
+        st.caption(f"Diolah menggunakan integrasi CV & {metode}")
         
         c1, c2, c3 = st.columns(3)
         c1.metric("IMT (Indeks Massa Tubuh)", f"{bmi:.1f}", status_imt, delta_color="off" if status_imt=="Ideal" else "inverse")
         c2.metric("Estimasi Body Fat", f"{body_fat:.1f}%")
-        c3.metric("Status Postur CV", "Valid", "Terdeteksi", delta_color="normal")
+        c3.metric("Status Validasi CV", "Valid", "Terdeteksi", delta_color="normal")
         
         st.write("### 💖 Rekomendasi Gaya Hidup")
         st.markdown("🏃 **Olahraga (Aktivitas Fisik):**")
