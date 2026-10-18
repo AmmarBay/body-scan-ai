@@ -1,155 +1,120 @@
 import streamlit as st
-import cv2
 import numpy as np
+import pickle
+from PIL import Image
 
-def calculate_angle(a, b, c):
-    a = np.array(a)
-    b = np.array(b)
-    c = np.array(c)
-    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
-    angle = np.abs(radians*180.0/np.pi)
-    if angle > 180.0: angle = 360.0 - angle
-    return angle
-
+# Persiapan Computer Vision
 try:
     import mediapipe as mp
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     MEDIAPIPE_READY = True
-except Exception as e:
+except Exception:
     MEDIAPIPE_READY = False
 
-st.set_page_config(page_title="BODY SCAN AI", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/863/863620.png", width=100)
-st.sidebar.title("BODY SCAN AI")
-st.sidebar.markdown("**Ketua Proyek:** Ammar Baytin Nurzaman (15240123)")
-st.sidebar.write("Anggota:\n- M Rofy Dwi Pamungkas\n- Ahmad Faqih Syarifuddin")
-
-st.title("Sistem Skrining & Analisis Biomekanik AI")
-st.markdown("*Minimum Viable Product (MVP) - v3.0 (Body Fat Edition)*")
+st.title("BODY SCAN AI")
+st.markdown("Sistem Skrining Komposisi Tubuh & Analisis Postur")
 st.write("---")
 
-tab1, tab2 = st.tabs(["🎥 Pemindai Biomekanik & AI Trainer", "📊 Dasbor Lemak Tubuh & Rekomendasi"])
+# 1. INPUT DATA PENGGUNA (Sesuai Blok Ke-2 Flowchart)
+st.header("1. Input Data Pengguna")
+col1, col2 = st.columns(2)
+with col1:
+    jenis_kelamin = st.selectbox("Jenis Kelamin", ["Pria", "Wanita"])
+    usia = st.number_input("Usia (tahun)", 10, 100, 22)
+    tinggi = st.number_input("Tinggi Badan (cm)", 100, 250, 173)
+with col2:
+    berat = st.number_input("Berat Badan (kg)", 30, 200, 79)
+    lingkar_pinggang = st.number_input("Lingkar Pinggang (cm)", 40, 150, 90)
+    tidur = st.number_input("Durasi Tidur (jam)", 2, 12, 6)
+aktivitas = st.selectbox("Aktivitas Fisik", ["Rendah", "Sedang", "Tinggi"])
+st.write("---")
 
-with tab1:
-    st.header("1. Input Parameter Medis")
-    col_in1, col_in2, col_in3, col_in4 = st.columns(4)
-    with col_in1:
-        jenis_kelamin = st.selectbox("Jenis Kelamin", ["Pria", "Wanita"])
-        usia = st.number_input("Usia (tahun)", 10, 100, 22)
-    with col_in2:
-        tinggi = st.number_input("Tinggi Badan (cm)", 100, 250, 173)
-        berat = st.number_input("Berat Badan (kg)", 30, 200, 79)
-    with col_in3:
-        lingkar_pinggang = st.number_input("Lingkar Pinggang (cm)", 40, 150, 90)
-        tidur = st.number_input("Durasi Tidur (jam)", 2, 12, 6)
-    with col_in4:
-        aktivitas = st.selectbox("Aktivitas Fisik", ["Rendah", "Sedang", "Tinggi"])
+# 2. AMBIL FOTO & COMPUTER VISION (Sesuai Blok Ke-3 & Ke-4 Flowchart)
+st.header("2. Ambil Foto Tubuh (Computer Vision)")
+st.info("Sistem akan mendeteksi titik-titik tubuh (Pose Estimation) dari gambar.")
+foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
-    st.write("---")
-    st.header("2. AI Fitness Trainer (Repetition Counter)")
+pose_detected = False
+if foto_kamera is not None and MEDIAPIPE_READY:
+    # Memproses Foto dengan MediaPipe
+    image = Image.open(foto_kamera)
+    image_np = np.array(image)
     
-    kamera_aktif = st.checkbox("🟢 Nyalakan Kamera AI Trainer")
-    frame_window = st.image([]) 
-    
-    if kamera_aktif:
-        cap = cv2.VideoCapture(0)
-        counter = 0
-        stage = None
-        if MEDIAPIPE_READY:
-            with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-                while kamera_aktif:
-                    ret, frame = cap.read()
-                    if not ret: break
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    results = pose.process(frame_rgb)
-                    
-                    if results.pose_landmarks:
-                        mp_drawing.draw_landmarks(frame_rgb, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                        landmarks = results.pose_landmarks.landmark
-                        bahu = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-                        siku = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-                        pergelangan = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-                        
-                        sudut_siku = calculate_angle(bahu, siku, pergelangan)
-                        
-                        if sudut_siku > 160: stage = "TURUN"
-                        if sudut_siku < 50 and stage == 'TURUN':
-                            stage = "NAIK"
-                            counter += 1
-                            
-                        siku_px = tuple(np.multiply(siku, [640, 480]).astype(int))
-                        cv2.putText(frame_rgb, str(int(sudut_siku)) + " derajat", siku_px, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-                        cv2.rectangle(frame_rgb, (0,0), (640, 70), (0,0,0), -1)
-                        cv2.putText(frame_rgb, f"STATUS: {stage} | TOTAL REPS: {counter}", (10, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-                    frame_window.image(frame_rgb)
-        cap.release()
+    with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5) as pose:
+        results = pose.process(image_np)
+        if results.pose_landmarks:
+            mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+            st.image(image_np, caption="Pose Estimation Berhasil Diekstrak", use_column_width=True)
+            st.success("✅ Titik-titik tubuh (Pose Landmarks) berhasil dipetakan!")
+            pose_detected = True
+        else:
+            st.warning("⚠️ Titik tubuh tidak terlihat jelas di kamera. Pastikan pencahayaan cukup.")
+st.write("---")
+
+# 3. PENGGABUNGAN DATA & MACHINE LEARNING (Sesuai Blok Ke-5 & Ke-6 Flowchart)
+st.header("3. Analisis Machine Learning")
+if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_container_width=True):
+    if foto_kamera is None:
+        st.error("Gagal diproses: Anda belum mengambil foto tubuh!")
     else:
-        st.info("Kamera dinonaktifkan.")
-
-with tab2:
-    st.header("Dasbor Analisis Komposisi Tubuh (Body Fat)")
-    
-    if st.button("🔄 Analisis Komposisi Tubuh dengan AI", type="primary"):
+        st.write("⏳ *Menggabungkan data foto (CV) dan data input numerik...*")
+        
         tinggi_m = tinggi / 100
         bmi = berat / (tinggi_m ** 2)
         
-        # 🧠 MEMANGGIL OTAK MACHINE LEARNING
         try:
-            import pickle
-            import sklearn
             with open('bodyfat_model.pkl', 'rb') as f:
                 model_ai = pickle.load(f)
-            # Prediksi AI berdasarkan: Usia, Berat, Tinggi, Perut, BMI
-            prediksi = model_ai.predict([[usia, berat, tinggi, lingkar_pinggang, bmi]])
-            body_fat = prediksi[0]
-            metode_kalkulasi = "✨ Diprediksi oleh AI (Gradient Boosting Regressor)"
-        except Exception as e:
-            # Fallback jika model gagal dimuat
+            # Prediksi AI
+            body_fat = model_ai.predict([[usia, berat, tinggi, lingkar_pinggang, bmi]])[0]
+            metode = "Gradient Boosting Regressor"
+        except Exception:
             jk_val = 1 if jenis_kelamin == "Pria" else 0
             body_fat = (1.20 * bmi) + (0.23 * usia) - (10.8 * jk_val) - 5.4
-            metode_kalkulasi = "⚠️ Diprediksi oleh Rumus Medis (AI Gagal Dimuat)"
+            metode = "Rumus Medis Standar"
 
-        # Kategori Lemak Tubuh
-        if jenis_kelamin == "Pria":
-            if body_fat < 14: bf_cat = "Atletis / Sangat Bugar"
-            elif 14 <= body_fat < 25: bf_cat = "Kategori Normal"
-            else: bf_cat = "Kelebihan Lemak (Risiko Obesitas)"
-        else:
-            if body_fat < 21: bf_cat = "Atletis / Sangat Bugar"
-            elif 21 <= body_fat < 32: bf_cat = "Kategori Normal"
-            else: bf_cat = "Kelebihan Lemak (Risiko Obesitas)"
-
-        if bmi < 18.5:
-            kategori, saran = "Underweight", "Fokus latihan hipertrofi beban, tingkatkan surplus kalori bernutrisi."
-        elif 18.5 <= bmi < 24.9:
-            kategori, saran = "Ideal", "Pertahankan rutinitas, seimbangkan latihan kardio dan resistensi otot."
-        elif 25 <= bmi < 29.9:
-            kategori, saran = "Overweight", "Terapkan defisit kalori, fokus kardio HIIT."
-        else:
-            kategori, saran = "Obesitas", "Kardio low-impact untuk menjaga sendi, perketat pengaturan diet."
-
-        st.caption(metode_kalkulasi)
-        st.subheader("1. Metrik Komposisi Tubuh")
-        col_m1, col_m2 = st.columns(2)
-        col_m1.metric("Skor IMT", f"{bmi:.1f}", kategori, delta_color="off" if kategori=="Ideal" else "inverse")
-        col_m2.metric("Estimasi Lemak Tubuh", f"{body_fat:.1f}%", bf_cat, delta_color="off" if bf_cat=="Kategori Normal" or bf_cat=="Atletis / Sangat Bugar" else "inverse")
-        
-        st.progress(min(int((body_fat / 40) * 100), 100), text="Persentase Lemak Tubuh")
-
-        st.subheader("2. Resep Gaya Hidup AI")
-        st.info(f"🏋️ **Program Latihan:** {saran}")
-        
-        if tidur < 7: 
-            st.error("🛌 **Regenerasi:** Kurang dari 7 jam! Berisiko menghambat metabolisme pembakaran lemak.")
-        else: 
-            st.success("🛌 **Regenerasi:** Optimal. Pertahankan untuk regulasi hormon.")
-        
+        # Klasifikasi Kondisi Tubuh
         batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
-        if lingkar_pinggang > batas_pinggang:
-            st.warning(f"⚠️ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) melebihi batas aman {jenis_kelamin} ({batas_pinggang} cm). Ini menandakan penumpukan lemak visceral perut. Kurangi asupan gula dan tingkatkan kardio.")
+        visceral_risk = lingkar_pinggang > batas_pinggang
+        
+        if bmi < 18.5: status_imt = "Underweight"
+        elif 18.5 <= bmi < 24.9: status_imt = "Ideal"
+        elif 25 <= bmi < 29.9: status_imt = "Overweight"
+        else: status_imt = "Obesitas"
+
+        # 4. HASIL SKRINING & REKOMENDASI (Sesuai Blok Kuning & Merah Muda Flowchart)
+        st.write("---")
+        st.header("4. Hasil Skrining Tubuh")
+        st.caption(f"Diolah menggunakan integrasi Pose Estimation & {metode}")
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("IMT (Indeks Massa Tubuh)", f"{bmi:.1f}", status_imt, delta_color="off" if status_imt=="Ideal" else "inverse")
+        c2.metric("Estimasi Body Fat", f"{body_fat:.1f}%")
+        c3.metric("Status Postur CV", "Valid" if pose_detected else "Tidak Jelas", "Terdeteksi" if pose_detected else "Error", delta_color="normal")
+        
+        st.write("### 💖 Rekomendasi Gaya Hidup")
+        # Olahraga
+        st.markdown("🏃 **Olahraga (Aktivitas Fisik):**")
+        if status_imt == "Obesitas" or visceral_risk:
+            st.info("Fokus pada *Low-impact cardio* (berenang, sepeda, jalan cepat) durasi 45 menit/hari untuk membakar lemak visceral tanpa membebani sendi lutut.")
         else:
-            st.success(f"✅ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) aman dari risiko sindrom metabolik (Batas {jenis_kelamin}: {batas_pinggang} cm).")
+            st.info("Kombinasikan Latihan Kekuatan Otot (Hipertrofi) dan *HIIT Cardio* 3-4 kali seminggu untuk menjaga persentase lemak tetap ideal.")
             
+        # Pola Makan
+        st.markdown("🍴 **Pola Makan (Saran Menu):**")
+        if visceral_risk:
+            st.warning("Lingkar pinggang melewati batas aman. Kurangi karbohidrat sederhana (gula, tepung) dan perbanyak protein nabati serta serat. Batasi surplus kalori harian.")
+        else:
+            st.success("Terapkan pola makan seimbang (Piring Makanku). Pertahankan asupan protein untuk menjaga massa otot yang terdeteksi.")
+            
+        # Tidur
+        st.markdown("🌙 **Tidur (Kualitas):**")
+        if tidur < 7:
+            st.error(f"Durasi tidur Anda ({tidur} jam) kurang dari rekomendasi medis (7-8 jam). Hal ini dapat mengganggu regulasi hormon kortisol dan memperlambat metabolisme pembakaran lemak.")
+        else:
+            st.success(f"Durasi tidur optimal ({tidur} jam). Pertahankan untuk memaksimalkan sintesis protein dan regenerasi sel tubuh setelah beraktivitas.")
+        
         st.balloons()
