@@ -129,4 +129,8 @@ with tab2:
         st.info(f"🏋️ **Program Latihan:** {saran}")
         if tidur < 7: st.error("🛌 **Regenerasi:** Kurang dari 7 jam! Berisiko menghambat metabolisme pembakaran lemak.")
         else: st.success("🛌 **Regenerasi:** Optimal. Pertahankan untuk regulasi hormon.")
+        if lingkar_pinggang > 90:
+            st.warning("⚠️ **Indikator Metabolik:** Lingkar pinggang di atas 90 cm. Kurangi asupan gula dan tingkatkan kardio.")
+        else:
+            st.success("✅ **Indikator Metabolik:** Lingkar pinggang aman dari risiko sindrom metabolik.")
         st.balloons()
