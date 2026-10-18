@@ -37,7 +37,7 @@ st.write("---")
 
 # 2. AMBIL FOTO & COMPUTER VISION
 st.header("2. Ambil Foto Tubuh (Computer Vision)")
-st.info("Sistem mendeteksi subjek manusia dengan Filter Super Ketat. Benda mati tertolak otomatis.")
+st.info("Sistem mendeteksi proporsi tubuh. Pastikan kepala hingga pinggang terlihat.")
 foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
 pose_detected = False
@@ -46,9 +46,10 @@ if foto_kamera is not None:
     image_np = np.array(image)
     validasi_sukses = False
     metode_deteksi = ""
+    pesan_error = "❌ Gagal: Sistem mendeteksi benda mati/bukan manusia!"
     
     if MEDIAPIPE_READY:
-        # Rencana A: Validasi Sendi MediaPipe (Sensitivitas Sangat Tinggi 80%)
+        # Rencana A: Validasi Sendi MediaPipe
         with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
             results = pose.process(image_np)
             if results.pose_landmarks:
@@ -56,27 +57,38 @@ if foto_kamera is not None:
                 validasi_sukses = True
                 metode_deteksi = "MediaPipe Pose"
                 
-    # Rencana B: Jika MediaPipe gagal, panggil OpenCV
+    # Rencana B: Jika MediaPipe gagal, panggil OpenCV dengan Analisis Proporsi Spasial
     if not validasi_sukses:
         gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # FILTER KETAT ANTI-HALUSINASI (minNeighbors=8, minSize=60x60)
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=8, minSize=(60, 60))
         
         if len(faces) > 0:
+            tinggi_gambar = image_np.shape[0] # Mengambil tinggi total foto
+            
             for (x, y, w, h) in faces:
-                cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3)
-            validasi_sukses = True
-            metode_deteksi = "OpenCV Face AI"
+                # Hitung rasio wajah terhadap tinggi frame foto
+                rasio_wajah = h / tinggi_gambar
+                
+                if rasio_wajah > 0.35:
+                    # Wajah memakan lebih dari 35% tinggi frame = Terlalu Dekat (Close-up Kepala)
+                    pesan_error = "❌ Gagal: Kamera terlalu dekat. Silakan mundur agar tubuh bagian atas terlihat!"
+                    validasi_sukses = False
+                    # Gambar kotak merah sebagai tanda ditolak
+                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (255, 0, 0), 3)
+                else:
+                    # Proporsi ideal, jarak kamera pas
+                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3)
+                    validasi_sukses = True
+                    metode_deteksi = "OpenCV Spatial Proportion AI"
 
     if validasi_sukses:
         st.image(image_np, caption=f"Divalidasi oleh {metode_deteksi}", use_column_width=True)
-        st.success("✅ Validasi Berhasil: Subjek manusia terdeteksi!")
+        st.success("✅ Validasi Berhasil: Proporsi tubuh manusia terdeteksi!")
         pose_detected = True
     else:
-        st.image(image_np, caption="Objek Tidak Dikenali", use_column_width=True)
-        st.error("❌ Gagal: Sistem mendeteksi benda mati/bukan manusia!")
+        st.image(image_np, caption="Validasi Tertolak", use_column_width=True)
+        st.error(pesan_error)
         pose_detected = False
 st.write("---")
 
@@ -86,7 +98,7 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
     if foto_kamera is None:
         st.error("Gagal diproses: Anda belum mengambil foto tubuh!")
     elif not pose_detected:
-        st.error("Gagal diproses: Foto tertolak! Sistem menolak memproses benda mati.")
+        st.error("Gagal diproses: Foto tertolak oleh sistem Computer Vision.")
     else:
         st.write("⏳ *Menggabungkan data foto (CV) dan data input numerik...*")
         
