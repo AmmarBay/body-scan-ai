@@ -9,9 +9,11 @@ try:
     mp_pose = mp.solutions.pose
     mp_drawing = mp.solutions.drawing_utils
     MEDIAPIPE_READY = True
-except Exception:
+except Exception as e:
+    st.error(f"⚠️ Sistem CV Gagal Dimuat: {e}")
     MEDIAPIPE_READY = False
 
+st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
 st.title("BODY SCAN AI")
