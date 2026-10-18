@@ -91,14 +91,26 @@ with tab1:
 with tab2:
     st.header("Dasbor Analisis Komposisi Tubuh (Body Fat)")
     
-    if st.button("🔄 Analisis Komposisi Tubuh", type="primary"):
+    if st.button("🔄 Analisis Komposisi Tubuh dengan AI", type="primary"):
         tinggi_m = tinggi / 100
         bmi = berat / (tinggi_m ** 2)
         
-        # Algoritma Body Fat Percentage (Deurenberg Formula)
-        jk_val = 1 if jenis_kelamin == "Pria" else 0
-        body_fat = (1.20 * bmi) + (0.23 * usia) - (10.8 * jk_val) - 5.4
-        
+        # 🧠 MEMANGGIL OTAK MACHINE LEARNING
+        try:
+            import pickle
+            import sklearn
+            with open('bodyfat_model.pkl', 'rb') as f:
+                model_ai = pickle.load(f)
+            # Prediksi AI berdasarkan: Usia, Berat, Tinggi, Perut, BMI
+            prediksi = model_ai.predict([[usia, berat, tinggi, lingkar_pinggang, bmi]])
+            body_fat = prediksi[0]
+            metode_kalkulasi = "✨ Diprediksi oleh AI (Gradient Boosting Regressor)"
+        except Exception as e:
+            # Fallback jika model gagal dimuat
+            jk_val = 1 if jenis_kelamin == "Pria" else 0
+            body_fat = (1.20 * bmi) + (0.23 * usia) - (10.8 * jk_val) - 5.4
+            metode_kalkulasi = "⚠️ Diprediksi oleh Rumus Medis (AI Gagal Dimuat)"
+
         # Kategori Lemak Tubuh
         if jenis_kelamin == "Pria":
             if body_fat < 14: bf_cat = "Atletis / Sangat Bugar"
@@ -118,6 +130,7 @@ with tab2:
         else:
             kategori, saran = "Obesitas", "Kardio low-impact untuk menjaga sendi, perketat pengaturan diet."
 
+        st.caption(metode_kalkulasi)
         st.subheader("1. Metrik Komposisi Tubuh")
         col_m1, col_m2 = st.columns(2)
         col_m1.metric("Skor IMT", f"{bmi:.1f}", kategori, delta_color="off" if kategori=="Ideal" else "inverse")
@@ -127,14 +140,16 @@ with tab2:
 
         st.subheader("2. Resep Gaya Hidup AI")
         st.info(f"🏋️ **Program Latihan:** {saran}")
-        if tidur < 7: st.error("🛌 **Regenerasi:** Kurang dari 7 jam! Berisiko menghambat metabolisme pembakaran lemak.")
-        else: st.success("🛌 **Regenerasi:** Optimal. Pertahankan untuk regulasi hormon.")
-        # --- LOGIKA INDIKATOR METABOLIK CERDAS ---
-        batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
         
+        if tidur < 7: 
+            st.error("🛌 **Regenerasi:** Kurang dari 7 jam! Berisiko menghambat metabolisme pembakaran lemak.")
+        else: 
+            st.success("🛌 **Regenerasi:** Optimal. Pertahankan untuk regulasi hormon.")
+        
+        batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
         if lingkar_pinggang > batas_pinggang:
             st.warning(f"⚠️ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) melebihi batas aman {jenis_kelamin} ({batas_pinggang} cm). Ini menandakan penumpukan lemak visceral perut. Kurangi asupan gula dan tingkatkan kardio.")
         else:
             st.success(f"✅ **Indikator Metabolik:** Lingkar pinggang ({lingkar_pinggang} cm) aman dari risiko sindrom metabolik (Batas {jenis_kelamin}: {batas_pinggang} cm).")
-        # -----------------------------------------
+            
         st.balloons()
