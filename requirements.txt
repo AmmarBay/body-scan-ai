@@ -1,9 +1,5 @@
-streamlit
-opencv-python-headless
-mediapipe
-numpy
-pandas
 scikit-learn
-mediapipe
-opencv-python-headless
+mediapipe==0.10.9
+opencv-python-headless==4.9.0.80
+protobuf<4.0.0
 Pillow
