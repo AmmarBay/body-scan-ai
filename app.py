@@ -72,7 +72,7 @@ if foto_kamera is not None:
                 rasio_wajah = h / tinggi_gambar
                 
                 if rasio_wajah > 0.30: # Jika wajah memakan 30% area foto
-                    pesan_error = "❌ Gagal: Kamera terlalu dekat (hanya wajah). Silakan mundur agar proporsi tubuh terlihat!"
+                    pesan_error = "❌ Gagal: Proporsi postur tidak valid (Kamera terlalu dekat atau objek tidak menyerupai struktur tubuh utuh)."
                     validasi_sukses = False
                     cv2.rectangle(image_np, (x, y), (x+w, y+h), (255, 0, 0), 3) # Kotak Merah
                 else:
