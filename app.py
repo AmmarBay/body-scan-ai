@@ -71,7 +71,6 @@ if foto_kamera is not None:
                 mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
                 landmarks = results.pose_landmarks.landmark
                 required_landmark_indices = (
-                    mp_pose.PoseLandmark.NOSE.value,
                     mp_pose.PoseLandmark.LEFT_SHOULDER.value,
                     mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
                 )
@@ -81,7 +80,7 @@ if foto_kamera is not None:
                 )
 
         if pose_detected:
-            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", width="stretch")
+            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", use_container_width=True)
             st.success("✅ Kepala dan kedua bahu terdeteksi dengan jelas.")
         else:
             st.image(image_np, caption="Validasi pose tertolak", width="stretch")
