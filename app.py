@@ -20,7 +20,7 @@ try:
             "`mp.solutions`; instal ulang dependensi dari requirements.txt."
         )
 except ImportError as exc:
-    MEDIAPIPE_IMPORT_ERROR = str(exc)
+    MEDIAPIPE_IMPORT_ERROR = f"{type(exc).__name__}: {exc}"
 
 st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
@@ -62,7 +62,8 @@ if foto_kamera is not None:
             "divalidasi. Periksa instalasi dependensi MediaPipe."
         )
         if MEDIAPIPE_IMPORT_ERROR:
-            st.caption(MEDIAPIPE_IMPORT_ERROR)
+            with st.expander("Detail teknis"):
+                st.code(MEDIAPIPE_IMPORT_ERROR)
     else:
         with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
             results = pose.process(image_np)
