@@ -90,7 +90,7 @@ if foto_kamera is not None:
                 "dan kedua bahu masuk ke dalam foto, pencahayaan cukup, dan kamera "
                 "tidak terlalu dekat."
             )
-st.write("---")
+st.divider()
 
 # 3. PENGGABUNGAN DATA & MACHINE LEARNING
 st.header("3. Analisis Machine Learning")
