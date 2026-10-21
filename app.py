@@ -1,19 +1,21 @@
 import streamlit as st
 import numpy as np
 import pickle
-import cv2
+from pathlib import Path
 from PIL import Image
 
-# Sembunyikan Error MediaPipe & Siapkan Status
 MEDIAPIPE_READY = False
+MEDIAPIPE_IMPORT_ERROR = None
 try:
     import mediapipe as mp
     if hasattr(mp, 'solutions'):
         mp_pose = mp.solutions.pose
         mp_drawing = mp.solutions.drawing_utils
         MEDIAPIPE_READY = True
-except Exception:
-    pass 
+    else:
+        MEDIAPIPE_IMPORT_ERROR = "Paket MediaPipe tidak menyediakan modul solutions."
+except ImportError as exc:
+    MEDIAPIPE_IMPORT_ERROR = str(exc)
 
 st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
@@ -37,57 +39,50 @@ st.write("---")
 
 # 2. AMBIL FOTO & COMPUTER VISION
 st.header("2. Ambil Foto Tubuh (Computer Vision)")
-st.info("Sistem mendeteksi proporsi tubuh. Pastikan tubuh terlihat dari kepala hingga dada/pinggang.")
+st.info(
+    "Sistem memvalidasi pose tubuh. Pastikan kepala dan kedua bahu terlihat jelas; "
+    "deteksi wajah saja tidak dianggap sebagai pose tubuh."
+)
 foto_kamera = st.camera_input("Ambil Foto Postur Tubuh")
 
 pose_detected = False
 if foto_kamera is not None:
-    image = Image.open(foto_kamera)
+    image = Image.open(foto_kamera).convert("RGB")
     image_np = np.array(image)
-    validasi_sukses = False
-    metode_deteksi = ""
-    
-    # Pesan default yang lebih akurat dan tidak menuduh benda mati
-    pesan_error = "❌ Gagal: Postur tubuh tidak jelas. Pastikan foto manusia utuh terlihat (kepala hingga dada/pinggang) dengan jarak yang pas."
-    
-    if MEDIAPIPE_READY:
+
+    if not MEDIAPIPE_READY:
+        st.image(image_np, caption="Validasi pose tidak tersedia", use_column_width=True)
+        st.error(
+            "MediaPipe Pose tidak berhasil dimuat, sehingga foto tidak dapat "
+            "divalidasi. Periksa instalasi dependensi MediaPipe."
+        )
+        if MEDIAPIPE_IMPORT_ERROR:
+            st.caption(MEDIAPIPE_IMPORT_ERROR)
+    else:
         with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
             results = pose.process(image_np)
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                validasi_sukses = True
-                metode_deteksi = "MediaPipe Pose"
-                
-    if not validasi_sukses:
-        gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        # Sensitivitas diturunkan sedikit agar wajah close-up tetap terbaca (minNeighbors=5)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-        
-        if len(faces) > 0:
-            tinggi_gambar = image_np.shape[0]
-            
-            for (x, y, w, h) in faces:
-                rasio_wajah = h / tinggi_gambar
-                
-                if rasio_wajah > 0.30: # Jika wajah memakan 30% area foto
-                    pesan_error = "❌ Gagal: Proporsi postur tidak valid (Kamera terlalu dekat atau objek tidak menyerupai struktur tubuh utuh)."
-                    validasi_sukses = False
-                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (255, 0, 0), 3) # Kotak Merah
-                else:
-                    cv2.rectangle(image_np, (x, y), (x+w, y+h), (0, 255, 0), 3) # Kotak Hijau
-                    validasi_sukses = True
-                    metode_deteksi = "OpenCV Spatial Proportion AI"
+                landmarks = results.pose_landmarks.landmark
+                shoulder_indices = (
+                    mp_pose.PoseLandmark.LEFT_SHOULDER.value,
+                    mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
+                )
+                pose_detected = all(
+                    index < len(landmarks) and landmarks[index].visibility >= 0.5
+                    for index in shoulder_indices
+                )
 
-    if validasi_sukses:
-        st.image(image_np, caption=f"Divalidasi oleh {metode_deteksi}", use_column_width=True)
-        st.success("✅ Validasi Berhasil: Proporsi tubuh manusia terdeteksi!")
-        pose_detected = True
-    else:
-        st.image(image_np, caption="Validasi Tertolak", use_column_width=True)
-        st.error(pesan_error)
-        pose_detected = False
+        if pose_detected:
+            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", use_column_width=True)
+            st.success("✅ Pose tubuh terdeteksi; kedua bahu terlihat jelas.")
+        else:
+            st.image(image_np, caption="Validasi pose tertolak", use_column_width=True)
+            st.error(
+                "Pose tubuh belum terdeteksi dengan cukup jelas. Pastikan kepala "
+                "dan kedua bahu masuk ke dalam foto, pencahayaan cukup, dan kamera "
+                "tidak terlalu dekat."
+            )
 st.write("---")
 
 # 3. PENGGABUNGAN DATA & MACHINE LEARNING
@@ -98,20 +93,74 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
     elif not pose_detected:
         st.error("Gagal diproses: Foto tertolak oleh sistem Computer Vision.")
     else:
-        st.write("⏳ *Menggabungkan data foto (CV) dan data input numerik...*")
+        st.write(
+            "⏳ *Menghitung estimasi dari data numerik setelah foto divalidasi...*"
+        )
         
         tinggi_m = tinggi / 100
         bmi = berat / (tinggi_m ** 2)
         
+        model_path = Path(__file__).resolve().parent / "bodyfat_extended_model.pkl"
         try:
-            with open('bodyfat_model.pkl', 'rb') as f:
-                model_ai = pickle.load(f)
-            body_fat = model_ai.predict([[usia, berat, tinggi, lingkar_pinggang, bmi]])[0]
-            metode = "Gradient Boosting Regressor"
-        except Exception:
-            jk_val = 1 if jenis_kelamin == "Pria" else 0
-            body_fat = (1.20 * bmi) + (0.23 * usia) - (10.8 * jk_val) - 5.4
-            metode = "Rumus Medis Standar"
+            with model_path.open("rb") as model_file:
+                model_artifact = pickle.load(model_file)
+        except FileNotFoundError:
+            st.error(
+                "Model BodyFat belum tersedia. Jalankan `python train_model.py` "
+                "terlebih dahulu."
+            )
+            st.stop()
+        except (
+            OSError,
+            pickle.UnpicklingError,
+            EOFError,
+            ImportError,
+            AttributeError,
+        ) as exc:
+            st.error(f"Model BodyFat tidak dapat dibaca: {exc}")
+            st.stop()
+
+        expected_features = [
+            "sex_encoded",
+            "age_years",
+            "weight_kg",
+            "height_m",
+            "abdomen_cm",
+            "bmi",
+        ]
+        if (
+            not isinstance(model_artifact, dict)
+            or model_artifact.get("feature_names") != expected_features
+            or "model" not in model_artifact
+        ):
+            st.error(
+                "Format model tidak cocok dengan input aplikasi. "
+                "Jalankan ulang `python train_model.py`."
+            )
+            st.stop()
+
+        input_features = [
+            1 if jenis_kelamin == "Pria" else 0,
+            usia,
+            berat,
+            tinggi_m,
+            lingkar_pinggang,
+            bmi,
+        ]
+        try:
+            predictions = np.asarray(
+                model_artifact["model"].predict([input_features]), dtype=float
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            st.error(f"Gagal menghitung estimasi BodyFat: {exc}")
+            st.stop()
+
+        if predictions.size != 1 or not np.isfinite(predictions[0]):
+            st.error("Model menghasilkan estimasi BodyFat yang tidak valid.")
+            st.stop()
+
+        body_fat = float(predictions[0])
+        metode = model_artifact.get("model_name", "Model machine learning")
 
         batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
         visceral_risk = lingkar_pinggang > batas_pinggang
@@ -124,7 +173,10 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
         # 4. HASIL SKRINING
         st.write("---")
         st.header("4. Hasil Skrining Tubuh")
-        st.caption(f"Diolah menggunakan integrasi CV & {metode}")
+        st.caption(
+            f"Estimasi dihitung dari input numerik setelah foto divalidasi oleh CV, "
+            f"menggunakan {metode}."
+        )
         
         c1, c2, c3 = st.columns(3)
         c1.metric("IMT (Indeks Massa Tubuh)", f"{bmi:.1f}", status_imt, delta_color="off" if status_imt=="Ideal" else "inverse")

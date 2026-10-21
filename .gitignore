@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+env/
+env*/
+
+.env
+.streamlit/secrets.toml
+
+.DS_Store
+
+# Keep dataset files local unless their license permits redistribution.
+BodyFat - Extended.csv
