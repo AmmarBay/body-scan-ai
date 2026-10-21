@@ -14,7 +14,11 @@ try:
         mp_drawing = mp.solutions.drawing_utils
         MEDIAPIPE_READY = True
     else:
-        MEDIAPIPE_IMPORT_ERROR = "Paket MediaPipe tidak menyediakan modul solutions."
+        media_pipe_version = getattr(mp, "__version__", "tidak diketahui")
+        MEDIAPIPE_IMPORT_ERROR = (
+            f"MediaPipe {media_pipe_version} tidak menyediakan API Pose lama "
+            "`mp.solutions`; instal ulang dependensi dari requirements.txt."
+        )
 except ImportError as exc:
     MEDIAPIPE_IMPORT_ERROR = str(exc)
 
