@@ -3,6 +3,7 @@ import pickle
 
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.ensemble import (
     ExtraTreesRegressor,
     GradientBoostingRegressor,
@@ -202,6 +203,10 @@ def main():
         },
         "age_range_years": [18, 69],
         "training_source": "CDC NHANES DXA 1999-2006 public-use data",
+        "runtime_versions": {
+            "numpy": np.__version__,
+            "scikit_learn": sklearn.__version__,
+        },
     }
     with MODEL_PATH.open("wb") as model_file:
         pickle.dump(artifact, model_file, protocol=pickle.HIGHEST_PROTOCOL)

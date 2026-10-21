@@ -1,4 +1,4 @@
-scikit-learn
+scikit-learn==1.9.1
 pandas
 streamlit==1.60.0
 mediapipe==0.10.15

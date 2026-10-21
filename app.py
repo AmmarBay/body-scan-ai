@@ -56,7 +56,7 @@ if foto_kamera is not None:
     image_np = np.array(image)
 
     if not MEDIAPIPE_READY:
-        st.image(image_np, caption="Validasi pose tidak tersedia", use_column_width=True)
+        st.image(image_np, caption="Validasi pose tidak tersedia", width="stretch")
         st.error(
             "MediaPipe Pose tidak berhasil dimuat, sehingga foto tidak dapat "
             "divalidasi. Periksa instalasi dependensi MediaPipe."
@@ -81,10 +81,10 @@ if foto_kamera is not None:
                 )
 
         if pose_detected:
-            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", use_column_width=True)
+            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", width="stretch")
             st.success("✅ Kepala dan kedua bahu terdeteksi dengan jelas.")
         else:
-            st.image(image_np, caption="Validasi pose tertolak", use_column_width=True)
+            st.image(image_np, caption="Validasi pose tertolak", width="stretch")
             st.error(
                 "Pose tubuh belum terdeteksi dengan cukup jelas. Pastikan kepala "
                 "dan kedua bahu masuk ke dalam foto, pencahayaan cukup, dan kamera "
@@ -129,8 +129,12 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
             EOFError,
             ImportError,
             AttributeError,
+            ValueError,
         ) as exc:
-            st.error(f"Model BodyFat tidak dapat dibaca: {exc}")
+            st.error(
+                f"Model BodyFat tidak cocok dengan versi dependensi aplikasi: {exc}. "
+                "Pasang ulang requirements.txt dan gunakan file model dari versi project ini."
+            )
             st.stop()
 
         expected_features = [
@@ -215,7 +219,7 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
             
         st.markdown("🌙 **Tidur (Kualitas):**")
         if tidur < 7:
-            st.error(f"Durasi tidur Anda ({tidur} jam) kurang dari rekomendasi medis (7-8 jam). Hal ini dapat mengganggu regulasi hormon kortisol.")
+            st.warning(f"Durasi tidur Anda ({tidur} jam) kurang dari rekomendasi medis (7-8 jam). Hal ini dapat mengganggu regulasi hormon kortisol.")
         else:
             st.success(f"Durasi tidur optimal ({tidur} jam). Pertahankan untuk regenerasi sel tubuh yang maksimal.")
         st.balloons()
