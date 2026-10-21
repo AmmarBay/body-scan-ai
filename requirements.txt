@@ -1,8 +1,8 @@
-scikit-learn==1.9.1
+scikit-learn==1.4.2
 pandas
 streamlit
 mediapipe==0.10.15
 opencv-contrib-python==4.11.0.86
 protobuf==4.25.3
-numpy==2.4.6
+numpy==1.26.4
 Pillow
