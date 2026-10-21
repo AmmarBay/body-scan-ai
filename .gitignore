@@ -13,3 +13,6 @@ env*/
 
 # Keep dataset files local unless their license permits redistribution.
 BodyFat - Extended.csv
+
+# Raw NHANES XPT downloads can be recreated with prepare_nhanes_dxa.py.
+data/nhanes_dxa/raw/

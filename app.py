@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import pickle
+import pandas as pd
 from pathlib import Path
 from PIL import Image
 
@@ -28,7 +29,7 @@ st.header("1. Input Data Pengguna")
 col1, col2 = st.columns(2)
 with col1:
     jenis_kelamin = st.selectbox("Jenis Kelamin", ["Pria", "Wanita"])
-    usia = st.number_input("Usia (tahun)", 10, 100, 22)
+    usia = st.number_input("Usia (tahun)", 18, 69, 22)
     tinggi = st.number_input("Tinggi Badan (cm)", 100, 250, 173)
 with col2:
     berat = st.number_input("Berat Badan (kg)", 30, 200, 79)
@@ -64,18 +65,19 @@ if foto_kamera is not None:
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
                 landmarks = results.pose_landmarks.landmark
-                shoulder_indices = (
+                required_landmark_indices = (
+                    mp_pose.PoseLandmark.NOSE.value,
                     mp_pose.PoseLandmark.LEFT_SHOULDER.value,
                     mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
                 )
                 pose_detected = all(
                     index < len(landmarks) and landmarks[index].visibility >= 0.5
-                    for index in shoulder_indices
+                    for index in required_landmark_indices
                 )
 
         if pose_detected:
             st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", use_column_width=True)
-            st.success("✅ Pose tubuh terdeteksi; kedua bahu terlihat jelas.")
+            st.success("✅ Kepala dan kedua bahu terdeteksi dengan jelas.")
         else:
             st.image(image_np, caption="Validasi pose tertolak", use_column_width=True)
             st.error(
@@ -87,6 +89,12 @@ st.write("---")
 
 # 3. PENGGABUNGAN DATA & MACHINE LEARNING
 st.header("3. Analisis Machine Learning")
+st.caption(
+    "Model memprediksi persentase lemak tubuh berbasis referensi DXA. "
+    "Dilatih dari populasi dewasa AS (NHANES 1999-2006); akurasi untuk "
+    "pengguna Indonesia belum divalidasi. Estimasi ini untuk skrining, "
+    "bukan diagnosis medis."
+)
 if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_container_width=True):
     if foto_kamera is None:
         st.error("Gagal diproses: Anda belum mengambil foto tubuh!")
@@ -100,14 +108,14 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
         tinggi_m = tinggi / 100
         bmi = berat / (tinggi_m ** 2)
         
-        model_path = Path(__file__).resolve().parent / "bodyfat_extended_model.pkl"
+        model_path = Path(__file__).resolve().parent / "bodyfat_nhanes_dxa_model.pkl"
         try:
             with model_path.open("rb") as model_file:
                 model_artifact = pickle.load(model_file)
         except FileNotFoundError:
             st.error(
-                "Model BodyFat belum tersedia. Jalankan `python train_model.py` "
-                "terlebih dahulu."
+                "Model DXA belum tersedia. Jalankan `python prepare_nhanes_dxa.py` "
+                "lalu `python train_nhanes_model.py` terlebih dahulu."
             )
             st.stop()
         except (
@@ -128,14 +136,16 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
             "abdomen_cm",
             "bmi",
         ]
+        models = model_artifact.get("model") if isinstance(model_artifact, dict) else None
         if (
             not isinstance(model_artifact, dict)
             or model_artifact.get("feature_names") != expected_features
-            or "model" not in model_artifact
+            or not isinstance(models, list)
+            or not models
         ):
             st.error(
                 "Format model tidak cocok dengan input aplikasi. "
-                "Jalankan ulang `python train_model.py`."
+                "Jalankan ulang `python train_nhanes_model.py`."
             )
             st.stop()
 
@@ -147,19 +157,21 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
             lingkar_pinggang,
             bmi,
         ]
+        input_frame = pd.DataFrame([input_features], columns=expected_features)
         try:
             predictions = np.asarray(
-                model_artifact["model"].predict([input_features]), dtype=float
+                [model.predict(input_frame)[0] for model in models],
+                dtype=float,
             )
         except (AttributeError, TypeError, ValueError) as exc:
             st.error(f"Gagal menghitung estimasi BodyFat: {exc}")
             st.stop()
 
-        if predictions.size != 1 or not np.isfinite(predictions[0]):
+        if predictions.size != len(models) or not np.isfinite(predictions).all():
             st.error("Model menghasilkan estimasi BodyFat yang tidak valid.")
             st.stop()
 
-        body_fat = float(predictions[0])
+        body_fat = float(np.mean(predictions))
         metode = model_artifact.get("model_name", "Model machine learning")
 
         batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
@@ -180,7 +192,7 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
         
         c1, c2, c3 = st.columns(3)
         c1.metric("IMT (Indeks Massa Tubuh)", f"{bmi:.1f}", status_imt, delta_color="off" if status_imt=="Ideal" else "inverse")
-        c2.metric("Estimasi Body Fat", f"{body_fat:.1f}%")
+        c2.metric("Estimasi Body Fat (acuan DXA)", f"{body_fat:.1f}%")
         c3.metric("Status Validasi CV", "Valid", "Terdeteksi", delta_color="normal")
         
         st.write("### 💖 Rekomendasi Gaya Hidup")
