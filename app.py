@@ -106,7 +106,7 @@ if foto_kamera is not None:
                         + body_highlight[person_mask] * 0.3
                     ).astype(np.uint8)
 
-                mp_drawing.draw_landmarks(
+                _ = mp_drawing.draw_landmarks(
                     image_np,
                     results.pose_landmarks,
                     mp_pose.POSE_CONNECTIONS,
