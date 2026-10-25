@@ -1,9 +1,12 @@
 import streamlit as st
 import numpy as np
 import pickle
+import sqlite3
 import pandas as pd
 from pathlib import Path
 from PIL import Image
+
+from submission_store import save_submission
 
 MEDIAPIPE_READY = False
 MEDIAPIPE_IMPORT_ERROR = None
@@ -26,6 +29,14 @@ st.set_page_config(page_title="BODY SCAN AI", layout="centered")
 
 st.title("BODY SCAN AI")
 st.markdown("Sistem Skrining Komposisi Tubuh & Analisis Postur")
+st.info(
+    "Jika Anda menyetujui dan analisis berhasil, data pengukuran serta hasil "
+    "skrining akan disimpan di server. Foto hanya dipakai untuk validasi pose "
+    "dan tidak disimpan."
+)
+izinkan_penyimpanan = st.checkbox(
+    "Saya setuju data pengukuran dan hasil skrining saya disimpan."
+)
 st.write("---")
 
 # 1. INPUT DATA PENGGUNA
@@ -100,7 +111,9 @@ st.caption(
     "bukan diagnosis medis."
 )
 if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_container_width=True):
-    if foto_kamera is None:
+    if not izinkan_penyimpanan:
+        st.error("Setujui penyimpanan data terlebih dahulu untuk melanjutkan analisis.")
+    elif foto_kamera is None:
         st.error("Gagal diproses: Anda belum mengambil foto tubuh!")
     elif not pose_detected:
         st.error("Gagal diproses: Foto tertolak oleh sistem Computer Vision.")
@@ -181,6 +194,24 @@ if st.button("⚙️ Gabungkan Data & Proses Analisis", type="primary", use_cont
 
         body_fat = float(np.mean(predictions))
         metode = model_artifact.get("model_name", "Model machine learning")
+
+        try:
+            save_submission(
+                sex=jenis_kelamin,
+                age_years=usia,
+                height_cm=tinggi,
+                weight_kg=berat,
+                waist_cm=lingkar_pinggang,
+                sleep_hours=tidur,
+                physical_activity=aktivitas,
+                bmi=bmi,
+                body_fat_pct=body_fat,
+                model_name=metode,
+            )
+        except (OSError, sqlite3.Error) as exc:
+            st.error(f"Analisis berhasil, tetapi data gagal disimpan: {exc}")
+        else:
+            st.success("Data pengukuran dan hasil skrining berhasil disimpan.")
 
         batas_pinggang = 90 if jenis_kelamin == "Pria" else 80
         visceral_risk = lingkar_pinggang > batas_pinggang

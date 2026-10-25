@@ -16,3 +16,7 @@ BodyFat - Extended.csv
 
 # Raw NHANES XPT downloads can be recreated with prepare_nhanes_dxa.py.
 data/nhanes_dxa/raw/
+
+# User-submitted health measurements are stored locally and must not be committed.
+data/bodyfit_submissions.sqlite3
+data/bodyfit_submissions.sqlite3-*
