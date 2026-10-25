@@ -126,9 +126,7 @@ if foto_kamera is not None:
             st.image(
                 processed_image,
                 caption="Deteksi tubuh MediaPipe: sorotan hijau dan kerangka pose",
-                width="stretch",
-                output_format="PNG",
-                alt="Foto tubuh dengan sorotan segmentasi dan kerangka pose MediaPipe",
+                use_container_width=True,
             )
             st.success(
                 "✅ Tubuh terdeteksi. Kepala, kedua bahu, dan pinggul terlihat jelas."
@@ -142,9 +140,7 @@ if foto_kamera is not None:
             st.image(
                 processed_image,
                 caption=caption,
-                width="stretch",
-                output_format="PNG",
-                alt="Hasil validasi foto tubuh oleh MediaPipe",
+                use_container_width=True,
             )
             st.error(
                 "Tubuh belum dapat divalidasi. Pastikan kepala, bahu, dan pinggul "
