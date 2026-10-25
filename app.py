@@ -76,29 +76,70 @@ if foto_kamera is not None:
             with st.expander("Detail teknis"):
                 st.code(MEDIAPIPE_IMPORT_ERROR)
     else:
-        with mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8) as pose:
+        with mp_pose.Pose(
+            static_image_mode=True,
+            model_complexity=1,
+            enable_segmentation=True,
+            min_detection_confidence=0.6,
+        ) as pose:
             results = pose.process(image_np)
             if results.pose_landmarks:
-                mp_drawing.draw_landmarks(image_np, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
                 landmarks = results.pose_landmarks.landmark
                 required_landmark_indices = (
+                    mp_pose.PoseLandmark.NOSE.value,
                     mp_pose.PoseLandmark.LEFT_SHOULDER.value,
                     mp_pose.PoseLandmark.RIGHT_SHOULDER.value,
+                    mp_pose.PoseLandmark.LEFT_HIP.value,
+                    mp_pose.PoseLandmark.RIGHT_HIP.value,
                 )
                 pose_detected = all(
                     index < len(landmarks) and landmarks[index].visibility >= 0.5
                     for index in required_landmark_indices
                 )
 
+                if results.segmentation_mask is not None:
+                    person_mask = results.segmentation_mask > 0.5
+                    body_highlight = np.zeros_like(image_np)
+                    body_highlight[:, :] = (0, 255, 120)
+                    image_np[person_mask] = (
+                        image_np[person_mask] * 0.7
+                        + body_highlight[person_mask] * 0.3
+                    ).astype(np.uint8)
+
+                mp_drawing.draw_landmarks(
+                    image_np,
+                    results.pose_landmarks,
+                    mp_pose.POSE_CONNECTIONS,
+                    landmark_drawing_spec=mp_drawing.DrawingSpec(
+                        color=(0, 255, 255),
+                        thickness=2,
+                        circle_radius=3,
+                    ),
+                    connection_drawing_spec=mp_drawing.DrawingSpec(
+                        color=(255, 80, 0),
+                        thickness=3,
+                    ),
+                )
+
         if pose_detected:
-            st.image(image_np, caption="Pose tervalidasi oleh MediaPipe", use_container_width=True)
-            st.success("✅ Kepala dan kedua bahu terdeteksi dengan jelas.")
+            st.image(
+                image_np,
+                caption="Deteksi tubuh MediaPipe: sorotan hijau dan kerangka pose",
+                use_container_width=True,
+            )
+            st.success(
+                "✅ Tubuh terdeteksi. Kepala, kedua bahu, dan pinggul terlihat jelas."
+            )
         else:
-            st.image(image_np, caption="Validasi pose tertolak", width="stretch")
+            caption = (
+                "Deteksi tubuh MediaPipe: landmark terlihat, tetapi belum cukup jelas"
+                if results.pose_landmarks
+                else "Deteksi tubuh MediaPipe: tubuh belum terdeteksi"
+            )
+            st.image(image_np, caption=caption, use_container_width=True)
             st.error(
-                "Pose tubuh belum terdeteksi dengan cukup jelas. Pastikan kepala "
-                "dan kedua bahu masuk ke dalam foto, pencahayaan cukup, dan kamera "
-                "tidak terlalu dekat."
+                "Tubuh belum dapat divalidasi. Pastikan kepala, bahu, dan pinggul "
+                "terlihat di dalam foto, pencahayaan cukup, dan kamera tidak terlalu dekat."
             )
 st.divider()
 
