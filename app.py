@@ -121,11 +121,14 @@ if foto_kamera is not None:
                     ),
                 )
 
+        processed_image = Image.fromarray(np.ascontiguousarray(image_np))
         if pose_detected:
             st.image(
-                image_np,
+                processed_image,
                 caption="Deteksi tubuh MediaPipe: sorotan hijau dan kerangka pose",
-                use_container_width=True,
+                width="stretch",
+                output_format="PNG",
+                alt="Foto tubuh dengan sorotan segmentasi dan kerangka pose MediaPipe",
             )
             st.success(
                 "✅ Tubuh terdeteksi. Kepala, kedua bahu, dan pinggul terlihat jelas."
@@ -136,7 +139,13 @@ if foto_kamera is not None:
                 if results.pose_landmarks
                 else "Deteksi tubuh MediaPipe: tubuh belum terdeteksi"
             )
-            st.image(image_np, caption=caption, use_container_width=True)
+            st.image(
+                processed_image,
+                caption=caption,
+                width="stretch",
+                output_format="PNG",
+                alt="Hasil validasi foto tubuh oleh MediaPipe",
+            )
             st.error(
                 "Tubuh belum dapat divalidasi. Pastikan kepala, bahu, dan pinggul "
                 "terlihat di dalam foto, pencahayaan cukup, dan kamera tidak terlalu dekat."
