@@ -1,3 +1,5 @@
+import base64
+from io import BytesIO
 import streamlit as st
 import numpy as np
 import pickle
@@ -122,11 +124,19 @@ if foto_kamera is not None:
                 )
 
         processed_image = Image.fromarray(np.ascontiguousarray(image_np))
+        image_buffer = BytesIO()
+        processed_image.save(image_buffer, format="JPEG", quality=90, optimize=True)
+        image_data = base64.b64encode(image_buffer.getvalue()).decode("ascii")
+        st.markdown(
+            f'<img src="data:image/jpeg;base64,{image_data}" '
+            'width="100%" '
+            'style="display:block;width:100%;height:auto;border-radius:0.5rem" '
+            'alt="Hasil deteksi tubuh MediaPipe">',
+            unsafe_allow_html=True,
+        )
         if pose_detected:
-            st.image(
-                processed_image,
-                caption="Deteksi tubuh MediaPipe: sorotan hijau dan kerangka pose",
-                use_container_width=True,
+            st.caption(
+                "Deteksi tubuh MediaPipe: sorotan hijau dan kerangka pose"
             )
             st.success(
                 "✅ Tubuh terdeteksi. Kepala, kedua bahu, dan pinggul terlihat jelas."
@@ -137,11 +147,7 @@ if foto_kamera is not None:
                 if results.pose_landmarks
                 else "Deteksi tubuh MediaPipe: tubuh belum terdeteksi"
             )
-            st.image(
-                processed_image,
-                caption=caption,
-                use_container_width=True,
-            )
+            st.caption(caption)
             st.error(
                 "Tubuh belum dapat divalidasi. Pastikan kepala, bahu, dan pinggul "
                 "terlihat di dalam foto, pencahayaan cukup, dan kamera tidak terlalu dekat."
